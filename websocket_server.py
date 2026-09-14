@@ -94,12 +94,20 @@ async def auth_handler(websocket):
     except Exception as e:
         logging.error(f"[{client_ip}] Lỗi kết nối: {e}")
 
+import http
+
+async def process_request(path, request_headers):
+    # Trả về 200 OK cho các ping từ Uptime Robot hoặc Render Health Check
+    if "Upgrade" not in request_headers.get("Connection", ""):
+        return (http.HTTPStatus.OK, [], b"Server is running! Uptime Robot can see this.")
+    return None
+
 async def run_ws_server(host="0.0.0.0", port=None):
     if port is None:
         import os
         port = int(os.environ.get("PORT", 8080))
     logging.info(f"Đang khởi tạo WebSocket Server tại {host}:{port}...")
-    async with websockets.serve(auth_handler, host, port):
+    async with websockets.serve(auth_handler, host, port, process_request=process_request):
         await asyncio.Future()  # Chạy mãi mãi
 
 if __name__ == "__main__":
