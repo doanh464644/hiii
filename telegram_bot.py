@@ -5,9 +5,19 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotComm
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, Application
 import database
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # --- Cấu hình ---
-BOT_TOKEN = "8645812017:AAEZJOOZriGDXMbMTUk0p8kJFI1J95DONKs"
-ADMIN_ID = 7509896689
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+ADMIN_ID_STR = os.environ.get("ADMIN_ID")
+ADMIN_ID = int(ADMIN_ID_STR) if ADMIN_ID_STR else None
+
+if not BOT_TOKEN or not ADMIN_ID:
+    print("❌ Lỗi Bảo Mật: Vui lòng thiết lập BOT_TOKEN và ADMIN_ID trong file .env hoặc biến môi trường!")
+    exit(1)
 
 # Thiết lập logging
 logging.basicConfig(
@@ -26,20 +36,22 @@ def is_admin(update: Update) -> bool:
 # ── /start ─────────────────────────────────────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
-        await update.message.reply_text("❌ Bạn không có quyền sử dụng Bot này.")
+        await update.message.reply_text("❌ <b>Bạn không có quyền sử dụng Bot này.</b>", parse_mode='HTML')
         return
 
     msg = (
-        "👋 *Chào mừng Admin BONGX!*\n\n"
-        "Các lệnh hỗ trợ:\n"
-        "🔹 `/gen [ngày] [max_thiết_bị]` — Tạo Key mới\n"
-        "   Ví dụ: `/gen 30 2` (30 ngày, tối đa 2 thiết bị)\n"
-        "🔹 `/del [key]` — Xóa Key khỏi hệ thống\n"
-        "🔹 `/list` — Liệt kê 20 Key gần nhất\n"
-        "🔹 `/info [key]` — Xem chi tiết Key & thiết bị\n"
-        "🔹 `/reset [key]` — Reset toàn bộ HWID của Key\n"
+        "👑 <b>BẢNG ĐIỀU KHIỂN BONGX ADMIN</b> 👑\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<b>Các lệnh hỗ trợ:</b>\n\n"
+        "🔹 <code>/gen [ngày] [thiết_bị]</code> — Tạo Key mới\n"
+        "<i>   (VD: /gen 30 2)</i>\n\n"
+        "🔹 <code>/info [key]</code> — Xem chi tiết Key\n"
+        "🔹 <code>/list</code> — Danh sách 20 Key gần nhất\n"
+        "🔹 <code>/del [key]</code> — Xóa Key khỏi hệ thống\n"
+        "🔹 <code>/reset [key]</code> — Reset HWID của Key\n"
+        "━━━━━━━━━━━━━━━━━━━━"
     )
-    await update.message.reply_text(msg, parse_mode='Markdown')
+    await update.message.reply_text(msg, parse_mode='HTML')
 
 # ── /gen ───────────────────────────────────────────────────────────────────
 async def gen_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -51,23 +63,25 @@ async def gen_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_key    = generate_random_key()
 
         if database.add_key(new_key, days, max_dev):
-            await update.message.reply_text(
-                f"✅ *Tạo Key thành công!*\n\n"
-                f"🔑 Key: `{new_key}`\n"
-                f"⏳ Hạn dùng: *{days} ngày*\n"
-                f"📱 Giới hạn thiết bị: *{max_dev} thiết bị*\n\n"
-                f"_Copy key này gửi cho khách hàng._",
-                parse_mode='Markdown'
+            msg = (
+                "✅ <b>TẠO KEY THÀNH CÔNG</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                f"🔑 <b>Key:</b> <code>{new_key}</code>\n"
+                f"⏳ <b>Hạn dùng:</b> {days} ngày\n"
+                f"📱 <b>Giới hạn:</b> {max_dev} thiết bị\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "<i>Copy key ở trên gửi cho khách hàng nhé!</i>"
             )
+            await update.message.reply_text(msg, parse_mode='HTML')
         else:
-            await update.message.reply_text("❌ Lỗi: Không thể lưu Key vào cơ sở dữ liệu.")
+            await update.message.reply_text("❌ <b>Lỗi:</b> Không thể lưu Key vào cơ sở dữ liệu.", parse_mode='HTML')
 
     except (ValueError, IndexError):
         await update.message.reply_text(
-            "⚠️ Sai cú pháp. Ví dụ:\n"
-            "`/gen 30` — 30 ngày, 1 thiết bị\n"
-            "`/gen 30 3` — 30 ngày, 3 thiết bị",
-            parse_mode='Markdown'
+            "⚠️ <b>Sai cú pháp. Ví dụ:</b>\n\n"
+            "<code>/gen 30</code> — 30 ngày, 1 thiết bị\n"
+            "<code>/gen 30 3</code> — 30 ngày, 3 thiết bị",
+            parse_mode='HTML'
         )
 
 # ── /list ──────────────────────────────────────────────────────────────────
@@ -76,47 +90,50 @@ async def list_keys(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keys = database.list_keys()
     if not keys:
-        await update.message.reply_text("📭 Danh sách Key hiện tại đang trống.")
+        await update.message.reply_text("📭 <b>Danh sách Key hiện tại đang trống.</b>", parse_mode='HTML')
         return
 
-    msg = "📋 *Danh sách 20 Key gần nhất:*\n\n"
+    msg = "📋 <b>DANH SÁCH 20 KEY GẦN NHẤT</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
     for key_str, active_dev, max_dev, expiry in keys:
         is_expired = expiry < __import__('datetime').datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         status_icon = "🔴" if is_expired else ("🟡" if active_dev >= max_dev else "🟢")
         msg += (
-            f"{status_icon} `{key_str}`\n"
-            f"   📱 {active_dev}/{max_dev} thiết bị  |  📅 {expiry[:10]}\n\n"
+            f"{status_icon} <code>{key_str}</code>\n"
+            f"      ├─ 📱 {active_dev}/{max_dev} thiết bị\n"
+            f"      └─ 📅 {expiry[:10]}\n\n"
         )
 
-    await update.message.reply_text(msg, parse_mode='Markdown')
+    await update.message.reply_text(msg, parse_mode='HTML')
 
 # ── /info ──────────────────────────────────────────────────────────────────
 async def info_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
 
     if not context.args:
-        await update.message.reply_text("⚠️ Vui lòng nhập Key. Ví dụ: `/info BONGX-XXXX`", parse_mode='Markdown')
+        await update.message.reply_text("⚠️ <b>Vui lòng nhập Key.</b> \nVí dụ: <code>/info BONGX-XXXX</code>", parse_mode='HTML')
         return
 
     info = database.get_key_info(context.args[0])
     if not info:
-        await update.message.reply_text("❌ Không tìm thấy Key này.")
+        await update.message.reply_text("❌ <b>Không tìm thấy Key này.</b>", parse_mode='HTML')
         return
 
     devices_text = ""
     if info["devices"]:
         for i, (hwid, reg_at) in enumerate(info["devices"], 1):
-            devices_text += f"   {i}. `{hwid[:16]}...`\n      📅 {reg_at}\n"
+            devices_text += f"      ├─ 💻 Máy {i}: <code>{hwid[:10]}...</code>\n      └─ 📅 {reg_at}\n"
     else:
-        devices_text = "   _(Chưa có thiết bị nào)_\n"
+        devices_text = "      └─ <i>(Chưa có thiết bị nào)</i>\n"
 
     msg = (
-        f"🔍 *Chi tiết Key:*\n\n"
-        f"🔑 `{info['key']}`\n"
-        f"📅 Tạo lúc: {info['created_at'][:10]}\n"
-        f"⏳ Hết hạn: {info['expiry'][:10]}\n"
-        f"📱 Thiết bị: {len(info['devices'])}/{info['max_devices']}\n\n"
-        f"*Danh sách thiết bị đã đăng ký:*\n"
+        "🔍 <b>CHI TIẾT KEY</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔑 <b>Key:</b> <code>{info['key']}</code>\n"
+        f"📅 <b>Tạo lúc:</b> {info['created_at'][:10]}\n"
+        f"⏳ <b>Hết hạn:</b> {info['expiry'][:10]}\n"
+        f"📱 <b>Thiết bị:</b> {len(info['devices'])}/{info['max_devices']}\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"<b>Danh sách thiết bị:</b>\n"
         f"{devices_text}"
     )
 
@@ -127,15 +144,14 @@ async def info_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🔄 Reset HWID", callback_data=f"reset|{info['key']}"),
         ]
     ]
-    await update.message.reply_text(msg, parse_mode='Markdown',
-                                    reply_markup=InlineKeyboardMarkup(keyboard))
+    await update.message.reply_text(msg, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ── /del ───────────────────────────────────────────────────────────────────
 async def del_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
 
     if not context.args:
-        await update.message.reply_text("⚠️ Vui lòng nhập Key. Ví dụ: `/del BONGX-XXXX`", parse_mode='Markdown')
+        await update.message.reply_text("⚠️ <b>Vui lòng nhập Key.</b> \nVí dụ: <code>/del BONGX-XXXX</code>", parse_mode='HTML')
         return
 
     key_to_del = context.args[0]
@@ -146,8 +162,8 @@ async def del_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
         InlineKeyboardButton("❌ Hủy", callback_data="cancel"),
     ]]
     await update.message.reply_text(
-        f"⚠️ Bạn có chắc muốn xóa key:\n`{key_to_del}`?",
-        parse_mode='Markdown',
+        f"⚠️ <b>Bạn có chắc muốn xóa key:</b>\n<code>{key_to_del}</code>?",
+        parse_mode='HTML',
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -156,18 +172,18 @@ async def reset_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update): return
 
     if not context.args:
-        await update.message.reply_text("⚠️ Vui lòng nhập Key. Ví dụ: `/reset BONGX-XXXX`", parse_mode='Markdown')
+        await update.message.reply_text("⚠️ <b>Vui lòng nhập Key.</b> \nVí dụ: <code>/reset BONGX-XXXX</code>", parse_mode='HTML')
         return
 
     key_to_reset = context.args[0]
     if database.reset_hwid(key_to_reset):
         await update.message.reply_text(
-            f"✅ Đã reset tất cả HWID cho Key:\n`{key_to_reset}`\n\n"
-            f"_Khách có thể đăng nhập trên thiết bị mới._",
-            parse_mode='Markdown'
+            f"✅ <b>Đã reset tất cả HWID cho Key:</b>\n<code>{key_to_reset}</code>\n\n"
+            f"<i>Khách có thể đăng nhập trên thiết bị mới.</i>",
+            parse_mode='HTML'
         )
     else:
-        await update.message.reply_text(f"❌ Không tìm thấy Key `{key_to_reset}`.")
+        await update.message.reply_text(f"❌ Không tìm thấy Key <code>{key_to_reset}</code>.", parse_mode='HTML')
 
 # ── Callback từ nút Inline ────────────────────────────────────────────────
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -175,28 +191,28 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.from_user.id != ADMIN_ID:
-        await query.edit_message_text("❌ Không có quyền.")
+        await query.edit_message_text("❌ <b>Không có quyền.</b>", parse_mode='HTML')
         return
 
     data = query.data
 
     if data == "cancel":
-        await query.edit_message_text("❎ Đã hủy thao tác.")
+        await query.edit_message_text("❎ <b>Đã hủy thao tác.</b>", parse_mode='HTML')
         return
 
     action, key_str = data.split("|", 1)
 
     if action == "del":
         if database.delete_key(key_str):
-            await query.edit_message_text(f"🗑 Đã xóa Key `{key_str}` khỏi hệ thống.", parse_mode='Markdown')
+            await query.edit_message_text(f"🗑 <b>Đã xóa Key</b> <code>{key_str}</code> khỏi hệ thống.", parse_mode='HTML')
         else:
-            await query.edit_message_text(f"❌ Không tìm thấy Key `{key_str}` để xóa.")
+            await query.edit_message_text(f"❌ Không tìm thấy Key <code>{key_str}</code> để xóa.", parse_mode='HTML')
 
     elif action == "reset":
         database.reset_hwid(key_str)
         await query.edit_message_text(
-            f"🔄 Đã reset HWID cho Key `{key_str}`.\n_Khách có thể đăng nhập trên thiết bị mới._",
-            parse_mode='Markdown'
+            f"🔄 <b>Đã reset HWID cho Key</b> <code>{key_str}</code>.\n<i>Khách có thể đăng nhập trên thiết bị mới.</i>",
+            parse_mode='HTML'
         )
 
 # ── Thiết lập Menu Gợi Ý Lệnh ──────────────────────────────────────────────
@@ -205,9 +221,9 @@ async def post_init(application: Application) -> None:
         BotCommand("start", "👋 Hiện Menu Hỗ Trợ & Hướng dẫn"),
         BotCommand("gen", "🔑 Tạo Key mới (VD: /gen 30 1)"),
         BotCommand("list", "📋 Xem danh sách 20 Key gần nhất"),
-        BotCommand("info", "🔍 Xem chi tiết Key & Thiết bị (VD: /info BONGX-...)"),
-        BotCommand("reset", "🔄 Reset HWID cho Key (VD: /reset BONGX-...)"),
-        BotCommand("del", "🗑 Xóa Key khỏi hệ thống (VD: /del BONGX-...)"),
+        BotCommand("info", "🔍 Xem chi tiết Key & Thiết bị"),
+        BotCommand("reset", "🔄 Reset HWID cho Key"),
+        BotCommand("del", "🗑 Xóa Key khỏi hệ thống"),
     ])
     print("✅ Đã cập nhật Menu Gợi ý lệnh trên Telegram!")
 

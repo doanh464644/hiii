@@ -9,3 +9,5 @@ venv/
 env.bak/
 venv.bak/
 keys.db
+
+.env
