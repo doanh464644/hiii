@@ -104,7 +104,12 @@ async def process_request(*args):
             # Trả về Response cho bản websockets mới (14.0+)
             try:
                 from websockets.http11 import Response
-                return Response(status_code=200, reason_phrase="OK", body=b"Server is running! Uptime Robot can see this.")
+                try:
+                    from websockets.datastructures import Headers
+                    headers_obj = Headers()
+                except ImportError:
+                    headers_obj = [] # Fallback
+                return Response(status_code=200, reason_phrase="OK", headers=headers_obj, body=b"Server is running! Uptime Robot can see this.")
             except ImportError:
                 # Trả về tuple cho bản cũ
                 import http
